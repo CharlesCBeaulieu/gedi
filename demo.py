@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import open3d as o3d
 from gedi import GeDi
+import posixpath
 
 '''
 demo to show the registration between two point clouds using GeDi descriptors
@@ -46,6 +47,7 @@ pts1 = torch.tensor(np.asarray(pcd1.points)[inds1]).float()
 # applying voxelisation to the point cloud
 pcd0 = pcd0.voxel_down_sample(voxel_size)
 pcd1 = pcd1.voxel_down_sample(voxel_size)
+
 
 _pcd0 = torch.tensor(np.asarray(pcd0.points)).float()
 _pcd1 = torch.tensor(np.asarray(pcd1.points)).float()
