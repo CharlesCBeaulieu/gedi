@@ -1,13 +1,13 @@
-import os
-import numpy as np
-import torch
+import numpy as np 
 import open3d as o3d
+import torch
+import os
 from gedi import GeDi
 
-def compute_registration(src_path, target_path, model, voxel_size, patches_per_pair):
+def compute_registration(src_pcd, tgt_pcd, model, voxel_size, patches_per_pair):
     # Load point clouds
-    pcd0 = o3d.io.read_point_cloud(src_path)
-    pcd1 = o3d.io.read_point_cloud(target_path)
+    pcd0 = src_pcd
+    pcd1 = tgt_pcd
 
     # Color the point clouds for visualization
     pcd0.paint_uniform_color([1, 0.706, 0])
@@ -63,8 +63,8 @@ def compute_registration(src_path, target_path, model, voxel_size, patches_per_p
     )
     return est_result01
 
-def main(input_dir, target_path):
-    # Configuration for GeDi
+def load_config():
+     # Configuration for GeDi
     config = {
         'dim': 32,  # Descriptor output dimension
         'samples_per_batch': 500,  # Batches to process the data on GPU
@@ -79,35 +79,63 @@ def main(input_dir, target_path):
 
     # Initialize GeDi
     gedi = GeDi(config=config)
-    registration_result = {}
+    
+    return gedi
 
-    # Read source files in the folder
-    sources_path = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith('.ply')]
+def data_augmentation(pcd_path, rotation_range, translation_range, noise_std, num_outliers):
+    pcd = o3d.io.read_point_cloud(pcd_path)
+    
+    # randomly rotate the point cloud
+    pcd.rotate(np.random.uniform(*rotation_range), np.array([0, 0, 1]))
+    
+    # randomly translate the point cloud
+    pcd.translate(np.random.uniform(*translation_range, 3))
+    
+    # add random noise to the point cloud
+    noise = noise_std * np.random.randn(np.asarray(pcd.points).shape[0], 3)
+    pcd.points = o3d.utility.Vector3dVector(np.asarray(pcd.points) + noise)
+    
+    # add random outliers to the point cloud
+    outliers = np.random.uniform(-1, 1, (num_outliers, 3))
+    pcd.points = o3d.utility.Vector3dVector(np.asarray(pcd.points) + outliers)
+    
+    return pcd
+    
 
-    # For every source, compute the registration using GeDi and save the result
-    for src_path in sources_path:
-        registration_result[src_path] = compute_registration(src_path, target_path, model=gedi, voxel_size=voxel_size, patches_per_pair=patches_per_pair)
+def normalize_point_cloud(pcd):
+    # Convert to numpy array
+    points = np.asarray(pcd.points)
 
-    # Evaluate which alignment is the best according to the fitness or rmse
-    sorted_by_fitness = sorted(registration_result.items(), key=lambda x: x[1].fitness, reverse=True)
-    sorted_by_rmse = sorted(registration_result.items(), key=lambda x: x[1].inlier_rmse, reverse=False)
+    # Compute centroid
+    centroid = np.mean(points, axis=0)
 
-    # Save the results
-    with open('result.txt', 'a') as f:
-        f.write("################################################\n")
-        f.write(f"Target: {target_path}\n")
+    # Center the point cloud
+    points -= centroid
+
+    # Compute scale
+    scale = np.max(np.linalg.norm(points, axis=1))
+
+    # Normalize to fit within unit sphere
+    if scale != 0:
+        points /= scale
+
+    # Set the points back to the point cloud
+    pcd.points = o3d.utility.Vector3dVector(points)
+
+    return pcd
+
+def benchmark(input_dir, target_path):
+
+    # Load the GeDi model
+    model = load_config()
+
+    for source in os.listdir(input_dir):
+        source = os.path.join(input_dir, source)
+        source = data_augmentation(source, rotation_range=(-np.pi, np.pi), translation_range=(-0.1, 0.1), noise_std=0.01, num_outliers=100)
+        result = compute_registration(source, target_path, model, voxel_size=0.01, patches_per_pair=5000)
         
-        f.write("\nSorted by RMSE:\n")
-        for item in sorted_by_rmse:
-            f.write(f"{item[0]}: fitness={item[1].fitness}, rmse={item[1].inlier_rmse}\n")
-        
-        f.write("\nSorted by Fitness:\n")
-        for item in sorted_by_fitness:
-            f.write(f"{item[0]}: fitness={item[1].fitness}, rmse={item[1].inlier_rmse}\n")
-
-    print("Results saved in result.txt")
-if __name__ == "__main__":
-    for file in os.listdir("data/10000"):
-        target = os.path.join("data/10000", file)
-        input_dir = "data/10000_noisy_hard"
-        main(input_dir, target)
+    
+    return est_result
+    
+    
+    
