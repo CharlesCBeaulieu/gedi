@@ -1,3 +1,8 @@
+# Détail du test
+
+Test porté sur 10 samples d'un sous dataset des cad de sbi, chaque cad à été utilisé comme target 1 fois, puis les autre scan on été augmenté. Voici le script utilisé pour ces tests : 
+
+```python
 import numpy as np 
 import open3d as o3d
 import torch
@@ -330,3 +335,4 @@ if __name__ == "__main__":
         
         # Plot the comparisons
         plot_comparison(df, target_name)
+```
