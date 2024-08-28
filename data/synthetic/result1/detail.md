@@ -1,3 +1,8 @@
+# Détail du test
+
+Test porté sur 10 samples d'un sous dataset des cad de sbi, chaque cad à été utilisé comme target 1 fois, puis les autre scan on été augmenté. Voici le script utilisé pour ces tests : 
+
+```python
 import numpy as np 
 import open3d as o3d
 import torch
@@ -279,9 +284,9 @@ def benchmark(input_dir, target_path, results_path):
         source_pcd = data_augmentation(
             source_path, 
             rotation_range=(-np.pi, np.pi), 
-            translation_range=(-1, 1), 
-            noise_std=0.05, 
-            num_outliers=200
+            translation_range=(-0.1, 0.1), 
+            noise_std=0.01, 
+            num_outliers=100
         )
         
         # Compute registration result
@@ -330,3 +335,4 @@ if __name__ == "__main__":
         
         # Plot the comparisons
         plot_comparison(df, target_name)
+```
