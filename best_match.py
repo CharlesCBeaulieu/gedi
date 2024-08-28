@@ -39,8 +39,8 @@ def compute_registration(src_path, target_path, model, voxel_size, patches_per_p
     pcd0_dsdv = o3d.pipelines.registration.Feature()
     pcd1_dsdv = o3d.pipelines.registration.Feature()
 
-    pcd0_dsdv.data = pcd0_desc.T.numpy().astype(np.float32)
-    pcd1_dsdv.data = pcd1_desc.T.numpy().astype(np.float32)
+    pcd0_dsdv.data = pcd0_desc.T
+    pcd1_dsdv.data = pcd1_desc.T
 
     _pcd0 = o3d.geometry.PointCloud()
     _pcd0.points = o3d.utility.Vector3dVector(pts0.numpy())
@@ -75,7 +75,7 @@ def main(input_dir, target_path):
     }
 
     voxel_size = 0.01
-    patches_per_pair = 500
+    patches_per_pair = 5000
 
     # Initialize GeDi
     gedi = GeDi(config=config)
@@ -92,16 +92,22 @@ def main(input_dir, target_path):
     sorted_by_fitness = sorted(registration_result.items(), key=lambda x: x[1].fitness, reverse=True)
     sorted_by_rmse = sorted(registration_result.items(), key=lambda x: x[1].inlier_rmse, reverse=False)
 
-    # Save the results using the fitness as metric
-    with open('sorted_by_fitness.txt', 'w') as f:
+    # Save the results
+    with open('result.txt', 'a') as f:
+        f.write("################################################\n")
+        f.write(f"Target: {target_path}\n")
+        
+        f.write("\nSorted by RMSE:\n")
+        for item in sorted_by_rmse:
+            f.write(f"{item[0]}: fitness={item[1].fitness}, rmse={item[1].inlier_rmse}\n")
+        
+        f.write("\nSorted by Fitness:\n")
         for item in sorted_by_fitness:
             f.write(f"{item[0]}: fitness={item[1].fitness}, rmse={item[1].inlier_rmse}\n")
 
-    # Save the results using the rmse as metric
-    with open('sorted_by_rmse.txt', 'w') as f:
-        for item in sorted_by_rmse:
-            f.write(f"{item[0]}: fitness={item[1].fitness}, rmse={item[1].inlier_rmse}\n")
-
+    print("Results saved in result.txt")
 if __name__ == "__main__":
-    input_dir = "data/1000_noisy"
-    main(input_dir, "data/1000/1.ply")
+    for file in os.listdir("data/10000"):
+        target = os.path.join("data/10000", file)
+        input_dir = "data/10000_noisy_hard"
+        main(input_dir, target)
