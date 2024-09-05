@@ -17,7 +17,7 @@ def download_unzip(data_dir, dest_dir, url):
 
 
 curr_dir = pathlib.Path(__file__).parent.resolve()
-data_dir = os.path.join(curr_dir, 'data')
+data_dir = os.path.join(curr_dir, 'data1')
 os.makedirs(data_dir, exist_ok=True)
 
 
