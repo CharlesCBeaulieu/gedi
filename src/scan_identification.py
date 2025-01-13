@@ -26,13 +26,9 @@ class ScanIdentification:
     def load_scan_and_process(scan_path: str) -> o3d.geometry.PointCloud:
         pcd = o3d.io.read_point_cloud(scan_path)
 
-        # Scale the scan
-        scan_points = np.asarray(pcd.points)
-        scaled_scan_points = scan_points * 1000
-
         # Center the scan
-        centroid = np.mean(scaled_scan_points, axis=0)
-        centered_scan_points = scaled_scan_points - centroid
+        centroid = np.mean(pcd.points, axis=0)
+        centered_scan_points = pcd.points - centroid
 
         pcd.points = o3d.utility.Vector3dVector(centered_scan_points)
         return pcd
@@ -58,6 +54,7 @@ class ScanIdentification:
             cad_num = cad_file.split(".")[0]
             # step 2: load the cad and compute the eigenvalues
             cad_pcd = o3d.io.read_point_cloud(os.path.join(cads_folder, cad_file))
+            cad_pcd.points = o3d.utility.Vector3dVector(np.asarray(cad_pcd.points) / 1000)
             cad_pcd_down = cad_pcd.voxel_down_sample(voxel_size)
             cad_eigs = np.linalg.eigvals(np.cov(np.asarray(cad_pcd_down.points).T))
             sorted_cad_eigs = np.sort(cad_eigs)[::-1]  # sort the eigenvalues, biggest first
@@ -182,9 +179,8 @@ class ScanIdentification:
             candidate_pcd = o3d.io.read_point_cloud(os.path.join(CADS_FOLDER, candidate_id + ".ply"))
             candidate_points = np.asarray(candidate_pcd.points)
             candidate_mean = np.mean(candidate_points, axis=0)
-            candidate_pcd.points = o3d.utility.Vector3dVector(
-                candidate_points - candidate_mean
-            )  # center the candidate to help the alignment
+            candidate_pcd.points = o3d.utility.Vector3dVector(candidate_points - candidate_mean)
+            candidate_pcd.points = o3d.utility.Vector3dVector(np.asarray(candidate_pcd.points) / 1000)
 
             # compute the transformation using GeDi
             gedi_result = ScanIdentification.gedi_compute(scan_c, candidate_pcd)
@@ -226,7 +222,35 @@ class ScanIdentification:
 
         print(f"Total time for fine identification : {total_time:.2f}")
 
+    @staticmethod
+    def compute_descriptors():
+        scan_files = [f for f in os.listdir(self.scan_path) if f.endswith('.ply')]
+        cad_files = [f for f in os.listdir(self.cad_path) if f.endswith('.ply')]
 
+        descriptors = {}
+
+        for scan_file in scan_files:
+            scan_id = scan_file.split('.')[0]
+            scan_pcd = o3d.io.read_point_cloud(os.path.join(self.scan_path, scan_file))
+            scan_pcd.points = o3d.utility.Vector3dVector(np.asarray(scan_pcd.points) / 1000)
+
+            for cad_file in cad_files:
+            cad_id = cad_file.split('.')[0]
+            cad_pcd = o3d.io.read_point_cloud(os.path.join(self.cad_path, cad_file))
+            cad_pcd.points = o3d.utility.Vector3dVector(np.asarray(cad_pcd.points) / 1000)
+
+            gedi_result = self.gedi_compute(scan_pcd, cad_pcd)
+
+            descriptors[scan_id] = {
+                "scan_path": os.path.join(self.scan_path, scan_file),
+                "cad_path": os.path.join(self.cad_path, cad_file),
+                "descriptor": gedi_result.transformation.tolist()
+            }
+
+        with open(os.path.join(self.output_path, 'descriptors.json'), 'w') as f:
+            json.dump(descriptors, f, indent=4)
+
+    
 def save_result_png(scan, scan_id, cad, cad_id, result, output_file):
     # Extract points for plotting
     points_scan = np.asarray(scan.points)
@@ -343,6 +367,11 @@ def plot_coarse_results(ranks: list, output_folder: str):
 
 
 if __name__ == "__main__":
+    scan_identifier = ScanIdentification(
+        scan_path="data/generated_SCAN_pool/pcd",
+        cad_path="data/sbi_CAD",
+        output_path="results/scan_identification",
+    )
     SCANS_FOLDER = "data/generated_SCAN_pool/pcd"
     CADS_FOLDER = "data/sbi_CAD"
     OUTPUT_FOLDER = "results/scan_identification"
@@ -350,7 +379,7 @@ if __name__ == "__main__":
     TopCandidateLimit = 20
     ranks = []
 
-    # check in the outpyt folder exists
+    # check in the output folder exists
     if not os.path.exists(OUTPUT_FOLDER):
         os.makedirs(OUTPUT_FOLDER)
     # experiment number
