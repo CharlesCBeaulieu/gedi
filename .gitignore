@@ -1,2 +1,5 @@
 *.ply
 *.png
+*.npy
+*.json
+
