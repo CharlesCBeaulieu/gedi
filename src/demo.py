@@ -1,32 +1,36 @@
 import torch
 import numpy as np
 import open3d as o3d
-from src.gedi import GeDi
+from gedi import GeDi
 import posixpath
 
-'''
+"""
 demo to show the registration between two point clouds using GeDi descriptors
 - the first visualisation shows the two point clouds in their original reference frame
 - the second visualisation show point cloud 0 transformed in the reference frame of point cloud 1
-'''
+"""
 
 
-config = {'dim': 32,                                            # descriptor output dimension
-          'samples_per_batch': 500,                             # batches to process the data on GPU
-          'samples_per_patch_lrf': 4000,                        # num. of point to process with LRF
-          'samples_per_patch_out': 512,                         # num. of points to sample for pointnet++
-          'r_lrf': .5,                                          # LRF radius
-          'fchkpt_gedi_net': 'data/chkpts/3dmatch/chkpt.tar'}   # path to checkpoint
+config = {
+    "dim": 32,  # descriptor output dimension
+    "samples_per_batch": 500,  # batches to process the data on GPU
+    "samples_per_patch_lrf": 4000,  # num. of point to process with LRF
+    "samples_per_patch_out": 512,  # num. of points to sample for pointnet++
+    "r_lrf": 0.5,  # LRF radius
+    "fchkpt_gedi_net": "data/chkpts/3dmatch/chkpt.tar",
+}  # path to checkpoint
 
-voxel_size = .01
+voxel_size = 0.01
 patches_per_pair = 5000
 
 # initialising class
 gedi = GeDi(config=config)
 
 # getting a pair of point clouds
-pcd0 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_0.ply')
-pcd1 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_5.ply')
+# pcd0 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_0.ply')
+# pcd1 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_5.ply')
+pcd0 = o3d.io.read_point_cloud("gedi_data/gen_scan/763620.ply")
+pcd1 = o3d.io.read_point_cloud("gedi_data/gt_cad_scaled_0001/763620.ply")
 
 pcd0.paint_uniform_color([1, 0.706, 0])
 pcd1.paint_uniform_color([0, 0.651, 0.929])
@@ -75,13 +79,18 @@ est_result01 = o3d.pipelines.registration.registration_ransac_based_on_feature_m
     pcd0_dsdv,
     pcd1_dsdv,
     mutual_filter=True,
-    max_correspondence_distance=.02,
+    max_correspondence_distance=0.02,
     estimation_method=o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
     ransac_n=3,
-    checkers=[o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(.9),
-              o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(.02)],
-    criteria=o3d.pipelines.registration.RANSACConvergenceCriteria(50000, 1000))
+    checkers=[
+        o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
+        o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(0.02),
+    ],
+    criteria=o3d.pipelines.registration.RANSACConvergenceCriteria(50000, 1000),
+)
 
 # applying estimated transformation
 pcd0.transform(est_result01.transformation)
 o3d.visualization.draw_geometries([pcd0, pcd1])
+combined = pcd0 + pcd1
+o3d.io.write_point_cloud("gedi_data/registration_results/random_result/exemple.ply", combined)
