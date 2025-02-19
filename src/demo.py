@@ -20,7 +20,7 @@ config = {
     "fchkpt_gedi_net": "data/chkpts/3dmatch/chkpt.tar",
 }  # path to checkpoint
 
-voxel_size = 0.01
+voxel_size = 0.001
 patches_per_pair = 5000
 
 # initialising class
@@ -29,8 +29,12 @@ gedi = GeDi(config=config)
 # getting a pair of point clouds
 # pcd0 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_0.ply')
 # pcd1 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_5.ply')
-pcd0 = o3d.io.read_point_cloud("gedi_data/gen_scan/763620.ply")
-pcd1 = o3d.io.read_point_cloud("gedi_data/gt_cad_scaled_0001/763620.ply")
+pcd0 = o3d.io.read_point_cloud("gedi_data/working_data/scan/point_cloud/preprocess/763620.ply")
+pcd1 = o3d.io.read_point_cloud("gedi_data/working_data/cad/point_cloud/preprocess/763620.ply")
+
+combined = pcd0 + pcd1
+print("Combined point cloud")
+o3d.io.write_point_cloud("gedi_data/registration_results/random_result/exemple_before_reg.ply", combined)
 
 pcd0.paint_uniform_color([1, 0.706, 0])
 pcd1.paint_uniform_color([0, 0.651, 0.929])
@@ -39,7 +43,7 @@ pcd1.paint_uniform_color([0, 0.651, 0.929])
 pcd0.estimate_normals()
 pcd1.estimate_normals()
 
-o3d.visualization.draw_geometries([pcd0, pcd1])
+# o3d.visualization.draw_geometries([pcd0, pcd1])
 
 # randomly sampling some points from the point cloud
 inds0 = np.random.choice(np.asarray(pcd0.points).shape[0], patches_per_pair, replace=False)
@@ -51,7 +55,6 @@ pts1 = torch.tensor(np.asarray(pcd1.points)[inds1]).float()
 # applying voxelisation to the point cloud
 pcd0 = pcd0.voxel_down_sample(voxel_size)
 pcd1 = pcd1.voxel_down_sample(voxel_size)
-
 
 _pcd0 = torch.tensor(np.asarray(pcd0.points)).float()
 _pcd1 = torch.tensor(np.asarray(pcd1.points)).float()
@@ -91,6 +94,6 @@ est_result01 = o3d.pipelines.registration.registration_ransac_based_on_feature_m
 
 # applying estimated transformation
 pcd0.transform(est_result01.transformation)
-o3d.visualization.draw_geometries([pcd0, pcd1])
+# o3d.visualization.draw_geometries([pcd0, pcd1])
 combined = pcd0 + pcd1
-o3d.io.write_point_cloud("gedi_data/registration_results/random_result/exemple.ply", combined)
+o3d.io.write_point_cloud("gedi_data/registration_results/random_result/exemple_after_reg.ply", combined)
