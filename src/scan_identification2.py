@@ -604,11 +604,11 @@ class ScanIdentification2:
 
         # Process scans for the 'best' experiment.
         scan_preprocess_folder_best = identification.scan_best_preprocess_folder
-        scans_best = [file for file in os.listdir(scan_preprocess_folder_best) if file.lower().endswith(".ply")][:50]
+        scans_best = [file for file in os.listdir(scan_preprocess_folder_best) if file.lower().endswith(".ply")][:10]
 
         # Process scans for the 'median' experiment.
         scan_preprocess_folder_median = identification.scan_median_preprocess_folder
-        scans_median = [file for file in os.listdir(scan_preprocess_folder_median) if file.lower().endswith(".ply")]
+        scans_median = [file for file in os.listdir(scan_preprocess_folder_median) if file.lower().endswith(".ply")][10]
 
         for scan in scans_best:
             scan_path = os.path.join(scan_preprocess_folder_best, scan)
@@ -675,4 +675,4 @@ class ScanIdentification2:
 
 if __name__ == "__main__":
     N = 314  # Maximum number of CAD files to process
-    ScanIdentification2.whole_pipeline1(preprocess_scan=True, preprocess_cad=True, compute_eig=True, compute_desc=True)
+    ScanIdentification2.whole_pipeline1(preprocess_scan=False, preprocess_cad=False, compute_eig=False, compute_desc=False)
