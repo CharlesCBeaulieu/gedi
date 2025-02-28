@@ -29,8 +29,8 @@ gedi = GeDi(config=config)
 # getting a pair of point clouds
 # pcd0 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_0.ply')
 # pcd1 = o3d.io.read_point_cloud('data/assets/threed_match_7-scenes-redkitchen_cloud_bin_5.ply')
-pcd0 = o3d.io.read_point_cloud("gedi_data/working_data/scan/point_cloud/preprocess/763620.ply")
-pcd1 = o3d.io.read_point_cloud("gedi_data/working_data/cad/point_cloud/preprocess/763620.ply")
+pcd0 = o3d.io.read_point_cloud("gedi_data/working_data/scan/point_cloud/763640.ply")
+pcd1 = o3d.io.read_point_cloud("gedi_data/working_data/cad/point_cloud/preprocess/763640.ply")
 
 combined = pcd0 + pcd1
 print("Combined point cloud")
