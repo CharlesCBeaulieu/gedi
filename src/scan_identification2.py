@@ -314,7 +314,7 @@ class ScanIdentification2:
             cad_num = cad.split(".")[0]
             cad_eig_val = np.load(os.path.join(self.cad_eig_folder, cad))
             cad_eig_val = np.sort(cad_eig_val)[::-1]
-            similarity = ScanIdentification2.eig_similarity(scan_eig, cad_eig_val, penalty=True)
+            similarity = ScanIdentification2.eig_similarity(scan_eig, cad_eig_val, penalty=False, dim_weight=[1,1,1])
             cad_score[cad_num] = similarity
             cad_eig_dict[cad_num] = cad_eig_val
 
@@ -430,7 +430,7 @@ class ScanIdentification2:
         os.makedirs(viz_folder, exist_ok=True)
 
         # Process candidate CADs (only the first N candidates).
-        for idx, cad in enumerate(tqdm(candidate_cads[:N], desc="Processing CADs for fine filtering")):
+        for idx, cad in enumerate(tqdm(candidate_cads, desc="Processing CADs for fine filtering")):
             # Load CAD point cloud.
             cad_path = os.path.join(self.cad_preprocess_folder, cad + ".ply")
             pcd1 = o3d.io.read_point_cloud(cad_path)
@@ -540,16 +540,46 @@ class ScanIdentification2:
             "fine_rank": target_fine_rank,
             "best_fitness": best_fitness,
             "best_rmse": best_rmse,
+            "nb_inliers_correspondence_set": num_inliers,
             "sorted_results": sorted_results,
         }
         return registration_result, fine_stats
 
     @staticmethod
     def eig_similarity(scan_eig, cad_eig, penalty=True, dim_weight=[1, 0.5, 0.25]):
+        """
+        Compute a similarity score between two scans based on their sorted eigenvalues.
+        A perfect match (e.g. [1, 1, 1] vs [1, 1, 1]) results in a score of 0.
+        Differences are computed as relative differences, weighted per dimension.
+        The L2 norm of these weighted differences is used so that a high error in one
+        dimension is not completely compensated by lower errors in others.
+        
+        Args:
+            scan_eig (array-like): Eigenvalues from the scan.
+            cad_eig (array-like): Eigenvalues from the CAD model.
+            penalty (bool): Whether to add a penalty based on the standard deviation of scan_eig.
+            dim_weight (list or array): Weights applied to the differences in each of the first three dimensions.
+            
+        Returns:
+            float: A similarity score (lower means more similar).
+        """
+        # Ensure inputs are numpy arrays
+        scan_eig = np.asarray(scan_eig)
+        cad_eig = np.asarray(cad_eig)
+        
+        # Compute relative differences for each eigenvalue
         diff = np.abs(scan_eig - cad_eig) / scan_eig
-        diff = diff[:3] * dim_weight
+        
+        # Apply weights to the first three dimensions
+        weighted_diff = diff[:3] * np.array(dim_weight)
+        
+        # Use L2 norm so that a high difference in any dimension has a stronger effect
+        score = np.linalg.norm(weighted_diff, ord=2)
+        
+        # Optionally, add a penalty term (e.g. standard deviation of scan eigenvalues)
         penalty_val = np.std(scan_eig) if penalty else 0
-        return np.sum(diff) + penalty_val
+        
+        return score + penalty_val
 
     @staticmethod
     def compute_descriptors(pcd_path: str, model, voxel_size: float = 0.001, patches_per_pair: int = 5000):
@@ -604,11 +634,11 @@ class ScanIdentification2:
 
         # Process scans for the 'best' experiment.
         scan_preprocess_folder_best = identification.scan_best_preprocess_folder
-        scans_best = [file for file in os.listdir(scan_preprocess_folder_best) if file.lower().endswith(".ply")][:10]
+        scans_best = [file for file in os.listdir(scan_preprocess_folder_best) if file.lower().endswith(".ply")]
 
         # Process scans for the 'median' experiment.
         scan_preprocess_folder_median = identification.scan_median_preprocess_folder
-        scans_median = [file for file in os.listdir(scan_preprocess_folder_median) if file.lower().endswith(".ply")][10]
+        scans_median = [file for file in os.listdir(scan_preprocess_folder_median) if file.lower().endswith(".ply")]
 
         for scan in scans_best:
             scan_path = os.path.join(scan_preprocess_folder_best, scan)
@@ -635,12 +665,13 @@ class ScanIdentification2:
                 {
                     "scan": scan,
                     "coarse_processing_time": coarse.get("processing_time", None),
-                    "target_coarse_rank": coarse.get("target_coarse_rank", None),
-                    "target_cum_error": coarse.get("target_cum_error", None),
+                    "coarse_rank": coarse.get("target_coarse_rank", None),
+                    "coarse_cum_error": coarse.get("target_cum_error", None),
                     "fine_processing_time": fine.get("processing_time", None),
                     "fine_rank": fine.get("fine_rank", None),
-                    "best_fitness": fine.get("best_fitness", None),
-                    "best_rmse": fine.get("best_rmse", None),
+                    "fine_fitness": fine.get("best_fitness", None),
+                    "fine_corr_rmse": fine.get("best_rmse", None),
+                    "fine_nb_inliers_correspondence_set": fine.get("nb_inliers_correspondence_set", None),
                 }
             )
 
@@ -658,21 +689,25 @@ class ScanIdentification2:
                 {
                     "scan": scan,
                     "coarse_processing_time": coarse.get("processing_time", None),
-                    "target_coarse_rank": coarse.get("target_coarse_rank", None),
-                    "target_cum_error": coarse.get("target_cum_error", None),
+                    "coarse_rank": coarse.get("target_coarse_rank", None),
+                    "coarse_cum_error": coarse.get("target_cum_error", None),
                     "fine_processing_time": fine.get("processing_time", None),
                     "fine_rank": fine.get("fine_rank", None),
-                    "best_fitness": fine.get("best_fitness", None),
-                    "best_rmse": fine.get("best_rmse", None),
+                    "fine_fitness": fine.get("best_fitness", None),
+                    "fine_rmse": fine.get("best_rmse", None),
+                    "fine_nb_inliers_correspondence_set": fine.get("nb_inliers_correspondence_set", None),
                 }
             )
 
         df_median = pd.DataFrame(data_median)
         print("Overall Stats DataFrame (Median):")
         print(df_median)
-        df_median.to_csv("gedi_data/working_data/stats_results/overall_stats_median.csv", index=False)
+        save_path = "gedi_data/working_data/stats_results/"
+        os.makedirs(save_path, exist_ok=True)  # Create directories if they don’t exist
+
+        df_median.to_csv(os.path.join(save_path, "overall_stats_median.csv"), index=False)
 
 
 if __name__ == "__main__":
     N = 314  # Maximum number of CAD files to process
-    ScanIdentification2.whole_pipeline1(preprocess_scan=False, preprocess_cad=False, compute_eig=False, compute_desc=False)
+    ScanIdentification2.whole_pipeline1(preprocess_scan=False, preprocess_cad=False, compute_eig=True, compute_desc=False)
