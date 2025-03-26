@@ -12,36 +12,36 @@ import pandas as pd
 
 
 class ScanIdentification2:
-    def __init__(self, base_path="bindmount/gedi_data/working_data"):
+    def __init__(self, data_base_path="/app/bindmount"):
         # Define the base path
-        self.base_path = base_path
+        self.base_path = data_base_path
 
         # raw data folders
-        self.scan_best_folder = self._create_directory("scan/scan_best/point_cloud")
-        self.scan_median_folder = self._create_directory("scan/scan_median/point_cloud")
-        self.cad_folder = self._create_directory("cad/point_cloud")
+        self.scan_best_folder = self._create_directory("gedi_data/scan/scan_best/point_cloud")
+        self.scan_median_folder = self._create_directory("gedi_data/scan/scan_median/point_cloud")
+        self.cad_folder = self._create_directory("gedi_data/cad/point_cloud")
 
         # preprocess folders
-        self.scan_best_preprocess_folder = self._create_directory("scan/scan_best/point_cloud/preprocess")
-        self.scan_median_preprocess_folder = self._create_directory("scan/scan_median/point_cloud/preprocess")
-        self.cad_preprocess_folder = self._create_directory("cad/point_cloud/preprocess")
+        self.scan_best_preprocess_folder = self._create_directory("gedi_data/scan/scan_median/point_cloud/preprocess")
+        self.scan_median_preprocess_folder = self._create_directory("gedi_data/scan/scan_best/point_cloud/preprocess")
+        self.cad_preprocess_folder = self._create_directory("gedi_data/cad/point_cloud/preprocess")
 
         # descriptor and eigenvalue folders
         # scan best
-        self.scan_best_desc_folder = self._create_directory("scan/scan_best/desc")
-        self.scan_best_inds_folder = self._create_directory("scan/scan_best/inds")
-        self.scan_best_eig_folder = self._create_directory("scan/scan_best/eigs")
-        self.scan_best_bbox_folder = self._create_directory("scan/scan_best/bbox")
+        self.scan_best_desc_folder = self._create_directory("gedi_data/scan/scan_best/desc")
+        self.scan_best_inds_folder = self._create_directory("gedi_data/scan/scan_best/inds")
+        self.scan_best_eig_folder = self._create_directory("gedi_data/scan/scan_best/eigs")
+        self.scan_best_bbox_folder = self._create_directory("gedi_data/scan/scan_best/bbox")
         # scan median
-        self.scan_median_desc_folder = self._create_directory("scan/scan_median/desc")
-        self.scan_median_inds_folder = self._create_directory("scan/scan_median/inds")
-        self.scan_median_eig_folder = self._create_directory("scan/scan_median/eigs")
-        self.scan_median_bbox_folder = self._create_directory("scan/scan_median/bbox")
+        self.scan_median_desc_folder = self._create_directory("gedi_data/scan/scan_median/desc")
+        self.scan_median_inds_folder = self._create_directory("gedi_data/scan/scan_median/inds")
+        self.scan_median_eig_folder = self._create_directory("gedi_data/scan/scan_median/eigs")
+        self.scan_median_bbox_folder = self._create_directory("gedi_data/scan/scan_median/bbox")
         # cad
-        self.cad_desc_folder = self._create_directory("cad/desc")
-        self.cad_inds_folder = self._create_directory("cad/inds")
-        self.cad_eig_folder = self._create_directory("cad/eigs")
-        self.cad_bbox_folder = self._create_directory("cad/bbox")
+        self.cad_desc_folder = self._create_directory("gedi_data/cad/desc")
+        self.cad_inds_folder = self._create_directory("gedi_data/cad/inds")
+        self.cad_eig_folder = self._create_directory("gedi_data/cad/eigs")
+        self.cad_bbox_folder = self._create_directory("gedi_data/cad/bbox")
 
     def __repr__(self):
         return f"ScanIdentification2(base_path={self.base_path})"
@@ -126,7 +126,7 @@ class ScanIdentification2:
             pcd = o3d.io.read_point_cloud(full_path)
             preprocessed_pcd = self.preprocess_scan(pcd)
             base_name = filename.split("_")[0]
-            output_filename = base_name + ".ply"
+            output_filename = base_name
             output_path = os.path.join(output_folder, output_filename)
 
             # Save only if the point cloud has enough points
@@ -151,31 +151,38 @@ class ScanIdentification2:
 
     def load_model(self):
         # Model configuration
-        print("---------------------------------")
-        print(self.base_path)
         config = {
             "dim": 32,  # descriptor output dimension
             "samples_per_batch": 10,
-            "samples_per_patch_lrf": 3000,
+            "samples_per_patch_lrf": 5000,
             "samples_per_patch_out": 512,
             "r_lrf": 0.5,
-            "fchkpt_gedi_net": f"{self.base_path}/model_weight/chkpts/3dmatch/chkpt.tar",
+            "fchkpt_gedi_net": "bindmount/gedi_data/model_weight/chkpts/3dmatch/chkpt.tar",
         }
         gedi = GeDi(config)
         return gedi
 
-    def compute_and_save_desc(self, model, scan_type="best"):
+    def compute_and_save_desc(self, model, scan_type="best", output_folder=None):
         """
         Compute and save descriptors for scans and CADs.
         model: GeDi, the model to use for descriptor computation.
         scan_type: str, "best" or "median"
         """
-        if scan_type not in ["best", "median"]:
-            raise ValueError("scan_type must be 'best' or 'median'.")
+        if scan_type not in ["best", "median", "cad"]:
+            raise ValueError("scan_type must be 'best', 'median', or 'cad'.")
 
-        scan_preprocess_folder = self.scan_best_preprocess_folder if scan_type == "best" else self.scan_median_preprocess_folder
-        scan_desc_folder = self.scan_best_desc_folder if scan_type == "best" else self.scan_median_desc_folder
-        scan_inds_folder = self.scan_best_inds_folder if scan_type == "best" else self.scan_median_inds_folder
+        if scan_type == "best":
+            scan_preprocess_folder = self.scan_best_preprocess_folder
+            scan_desc_folder = self.scan_best_desc_folder
+            scan_inds_folder = self.scan_best_inds_folder
+        elif scan_type == "median":
+            scan_preprocess_folder = self.scan_median_preprocess_folder
+            scan_desc_folder = self.scan_median_desc_folder
+            scan_inds_folder = self.scan_median_inds_folder
+        else:  # scan_type == "cad"
+            scan_preprocess_folder = self.cad_preprocess_folder
+            scan_desc_folder = self.cad_desc_folder
+            scan_inds_folder = self.cad_inds_folder
 
         total_time_scan = self._process_folder(
             input_folder=scan_preprocess_folder,
@@ -212,8 +219,32 @@ class ScanIdentification2:
         print(f"Average time per scan: {total_time_scan / max(1, len(os.listdir(scan_preprocess_folder))):.2f} seconds")
         if not cad_already_computed:
             print(f"Average time per CAD: {total_time_cad / max(1, len(cad_files)):.2f} seconds")
+            
+    def compute_eig_CAD(self):
+        """
+        Compute and save eigenvalues for CADs.
+        """
+        start = time.time()
+        print("\033[93m🛠️ Computing and saving eigenvalues for CADs... 🛠️\033[0m")
 
-    def compute_and_save_eig(self, scan_type="best"):
+        cad_files = [f for f in os.listdir(self.cad_preprocess_folder) if f.lower().endswith(".ply")]
+        for cad in tqdm(cad_files, desc="Computing CAD eigenvalues"):
+            cad_path = os.path.join(self.cad_preprocess_folder, cad)
+            pcd = o3d.io.read_point_cloud(cad_path)
+            if len(pcd.points) == 0:
+                print(f"Skipping {cad}: empty point cloud.")
+                continue
+            eig_values = np.linalg.eig(np.cov(np.asarray(pcd.points).T))[0]
+            np.save(os.path.join(self.cad_eig_folder, cad.split(".")[0]), eig_values)
+            # Compute bounding box dimensions and save them.
+            bbox = np.array(pcd.get_axis_aligned_bounding_box().get_extent())
+            np.save(os.path.join(self.cad_bbox_folder, f"{cad.split('.')[0]}"), bbox)
+
+        end = time.time()
+        print("\033[92m✅ Done!\033[0m")
+        print(f"⏳ Time taken for computing and saving CAD eigenvalues: {end - start:.2f} seconds")
+
+    def compute_eig_and_bbox(self, scan_type="best"):
         """
         Compute and save eigenvalues for the specified scan type ('best' or 'median').
         Also computes CAD eigenvalues if they have not been computed yet.
@@ -241,11 +272,14 @@ class ScanIdentification2:
             
             # Compute bounding box dimensions and save them.
             bbox = np.array(pcd.get_axis_aligned_bounding_box().get_extent())
-            np.save(os.path.join(scan_bbox_folder, f"{scan.split('.')[0]}_bbox"), bbox)
+            np.save(os.path.join(scan_bbox_folder, f"{scan.split('.')[0]}"), bbox)
 
         cad_files = [f for f in os.listdir(self.cad_preprocess_folder) if f.lower().endswith(".ply")]
         cad_already_computed = all(
             os.path.exists(os.path.join(self.cad_eig_folder, f"{os.path.splitext(f)[0]}.npy"))
+            for f in cad_files
+        ) and all(
+            os.path.exists(os.path.join(self.cad_bbox_folder, f"{os.path.splitext(f)[0]}.npy"))
             for f in cad_files
         )
 
@@ -289,29 +323,36 @@ class ScanIdentification2:
 
         scan_eig = np.load(os.path.join(scan_eig_folder, target_scan + ".npy"))
         sorted_scan_eigs = np.sort(scan_eig)[::-1]
-        scan_bbox = np.load(os.path.join(scan_bbox_folder, target_scan + "_bbox.npy"))
+        scan_bbox = np.load(os.path.join(scan_bbox_folder, target_scan + ".npy"))
         sorted_scan_bbox = np.sort(scan_bbox)[::-1]
 
         print("\033[93m🛠️ ----------------- Coarse Filtering (In Progress...) ----------------- 🛠️\033[0m")
         print(f"Target scan: {target_scan}")
         print(f"Target scan eigenvalues: {', '.join(f'{val:.4f}' for val in sorted_scan_eigs[:3])}")
 
+        # Dictionaries to store scores and eigenvalues.
+        cad_score = {}
+        cad_eig_dict = {}
+        cad_bbox_score = {}  # New dictionary for bbox scores
+
         # Process only the first N CAD eigenvalue files.
-        for cad in tqdm(os.listdir(self.cad_eig_folder)[:N], desc="Processing CADs for coarse filtering"):
+        for cad in os.listdir(self.cad_eig_folder)[:N]:
             cad_num = cad.split(".")[0]
             cad_eigs = np.load(os.path.join(self.cad_eig_folder, cad))
             sorted_cad_eigs = np.sort(cad_eigs)[::-1]
-            cad_bbox = np.load(os.path.join(self.cad_bbox_folder, cad_num + "_bbox.npy"))
+            cad_bbox = np.load(os.path.join(self.cad_bbox_folder, cad_num + ".npy"))
             sorted_cad_bbox = np.sort(cad_bbox)[::-1]
             
             # Compute similarity scores
             eig_sim_score = ScanIdentification2.eig_similarity(sorted_scan_eigs, sorted_cad_eigs)
             bbox_sim_score = ScanIdentification2.bbox_similarity(sorted_scan_bbox, sorted_cad_bbox)
             
-            # Here you can combine or choose one of the scores; we use the eigenvalue score.
+            # Save scores: use eigenvalue score for ranking but also keep bbox score.
             cad_score[cad_num] = eig_sim_score
             cad_eig_dict[cad_num] = sorted_cad_eigs
+            cad_bbox_score[cad_num] = bbox_sim_score
 
+        # Sort by the eigenvalue score.
         sorted_cad_score = dict(sorted(cad_score.items(), key=lambda item: item[1]))
         end = time.time()
 
@@ -323,16 +364,22 @@ class ScanIdentification2:
                 target_cum_error = score
                 break
 
-        header = f"| {'Rank':^6} | {'CAD':^10} | {'Score (lower is better)':^25} | {'Eigenvalues':^30} | {'Status':^8} |"
+        # Update header to include the bbox score.
+        header = (
+            f"| {'Rank':^6} | {'CAD':^10} | {'Eigen Score (lower is better)':^30} | "
+            f"{'BBox Score':^15} | {'Eigenvalues':^30} | {'Status':^8} |"
+        )
         print(header)
         print("-" * len(header))
         for idx, (cad, score) in enumerate(sorted_cad_score.items(), start=1):
             eig_values = ", ".join(f"{val:.4f}" for val in cad_eig_dict[cad][:3])
+            bbox_score = cad_bbox_score[cad]
             status = "✅" if (cad == target_scan and idx == 1) else ("⬅️" if cad == target_scan else "")
-            print(f"| {idx:^6} | {cad:^10} | {score:^25.4f} | {eig_values:^30} | {status:^8} |")
+            print(f"| {idx:^6} | {cad:^10} | {score:^30.4f} | {bbox_score:^15.4f} | {eig_values:^30} | {status:^8} |")
         print("-" * len(header))
         print("\033[92m✅ Coarse Filtering Done! ✅\033[0m")
 
+        # Save results to CSV, including the bbox score.
         results_folder = os.path.join(self.base_path, "results/csv")
         os.makedirs(results_folder, exist_ok=True)
         target_folder = os.path.join(results_folder, f"{target_scan}_exp")
@@ -340,17 +387,20 @@ class ScanIdentification2:
         csv_file_path = os.path.join(target_folder, "coarse_filtering_results.csv")
         with open(csv_file_path, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["Rank", "CAD", "Score (lower is better)", "Eigenvalues", "Status"])
+            writer.writerow(["Rank", "CAD", "Eigen Score (lower is better)", "BBox Score", "Eigenvalues", "Status"])
             for idx, (cad, score) in enumerate(sorted_cad_score.items(), start=1):
                 eig_values = ", ".join(f"{val:.4f}" for val in cad_eig_dict[cad][:3])
+                bbox_score = cad_bbox_score[cad]
                 status = "✅" if (cad == target_scan and idx == 1) else ("⬅️" if cad == target_scan else "")
-                writer.writerow([idx, cad, f"{score:.4f}", eig_values, status])
+                writer.writerow([idx, cad, f"{score:.4f}", f"{bbox_score:.4f}", eig_values, status])
         print(f"CSV file saved to: {csv_file_path}")
 
+        # Include the bbox score dictionary in the returned stats.
         coarse_stats = {
             "target_scan": target_scan,
             "processing_time": end - start,
             "sorted_scores": sorted_cad_score,
+            "cad_bbox_scores": cad_bbox_score,
             "target_coarse_rank": target_coarse_rank,
             "target_cum_error": target_cum_error,
         }
@@ -523,7 +573,7 @@ class ScanIdentification2:
         """
         scan_bbox = np.asarray(scan_bbox)
         cad_bbox = np.asarray(cad_bbox)
-        # Replace any zero dimension with a small epsilon to avoid division by zero.
+        # Avoid division by zero.
         safe_scan_bbox = np.where(scan_bbox == 0, 1e-8, scan_bbox)
         diff = np.abs(scan_bbox - cad_bbox) / safe_scan_bbox
         score = np.linalg.norm(diff, ord=2)
@@ -561,13 +611,14 @@ class ScanIdentification2:
             identification.preprocess_all_cads(scale_factor=0.001)
 
         if compute_eig:
-            identification.compute_and_save_eig(scan_type="best")
-            identification.compute_and_save_eig(scan_type="median")
+            identification.compute_eig_and_bbox(scan_type="best")
+            identification.compute_eig_and_bbox(scan_type="median")
 
         if compute_desc:
             identification.compute_and_save_desc(gedi, scan_type="best")
             identification.compute_and_save_desc(gedi, scan_type="median")
-
+  
+        
         overall_stats_best = {}
         overall_stats_median = {}
 
@@ -577,7 +628,8 @@ class ScanIdentification2:
         scan_preprocess_folder_median = identification.scan_median_preprocess_folder
         scans_median = [f for f in os.listdir(scan_preprocess_folder_median) if f.lower().endswith(".ply")]
 
-        for scan in scans_best:
+        # --- Process best scans ---
+        for scan in tqdm(scans_best, desc="Processing best scans"):
             scan_path = os.path.join(scan_preprocess_folder_best, scan)
             print(f"\nProcessing best scan: {scan_path}")
             coarse_stats = identification.coarse_filtering(scan_path)
@@ -585,7 +637,8 @@ class ScanIdentification2:
             _, fine_stats = identification.fine_filtering(scan_path, candidate_cads)
             overall_stats_best[os.path.basename(scan_path)] = {"coarse": coarse_stats, "fine": fine_stats}
 
-        for scan in scans_median:
+        # --- Process median scans ---
+        for scan in tqdm(scans_median, desc="Processing median scans"):
             scan_path = os.path.join(scan_preprocess_folder_median, scan)
             print(f"\nProcessing median scan: {scan_path}")
             coarse_stats = identification.coarse_filtering(scan_path)
@@ -612,7 +665,7 @@ class ScanIdentification2:
         df_best = pd.DataFrame(data_best)
         print("Overall Stats DataFrame (Best):")
         print(df_best)
-        df_best.to_csv("bindmount/gedi_data/working_data/stats_results/overall_best", index=False)
+        df_best.to_csv(f"/app/bindmount/gedi_data/working_data/stats_results/overall_best", index=False)
 
         data_median = []
         for scan, stats in overall_stats_median.items():
@@ -635,9 +688,10 @@ class ScanIdentification2:
         print(df_median)
         save_path = "gedi_data/working_data/stats_results/"
         os.makedirs(save_path, exist_ok=True)
-        df_median.to_csv("bindmount/gedi_data/working_data/stats_results/overall_median", index=False)
+        df_median.to_csv("/app/bindmount/gedi_data/working_data/stats_results/overall_median", index=False)
+        
 
 
 if __name__ == "__main__":
     N = 314  # Maximum number of CAD files to process
-    ScanIdentification2.pipeline1(preprocess_scan=True, preprocess_cad=True, compute_eig=True, compute_desc=False)
+    ScanIdentification2.pipeline1(preprocess_scan=False, preprocess_cad=False, compute_eig=False, compute_desc=False)
