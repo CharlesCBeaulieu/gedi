@@ -31,29 +31,28 @@ def load_model(config):
     return GeDi(config)
 
 
-def compute_eig_similarity1(eigenvalues1, eigenvalues2):
+def compute_eig_similarity1(scan_eig, cad_eig, penalty=True, dim_weight=[1, 0.5, 0.25]):
+    diff = np.abs(scan_eig - cad_eig) / scan_eig
+    diff = diff[:3] * dim_weight
+    penalty_val = np.std(scan_eig) if penalty else 0
+    return np.sum(diff) + penalty_val
+
+
+def compute_eig_similarity2(eigenvalues1, eigenvalues2, weights=[1, 0.5, 0.25], alpha=2.0):
     scan_eig = np.asarray(eigenvalues1)
     cad_eig = np.asarray(eigenvalues2)
     diff = np.abs(scan_eig - cad_eig) / scan_eig
-    score = np.linalg.norm(diff, ord=2)
-    d = len(scan_eig)
-    return score / np.sqrt(d)
-
-
-def compute_eig_similarity2(eigenvalues1, eigenvalues2, alpha=1.0):
-    scan_eig = np.asarray(eigenvalues1)
-    cad_eig = np.asarray(eigenvalues2)
-    diff = np.abs(scan_eig - cad_eig) / scan_eig
-    base_score = np.sum(diff)
-    median_diff = np.median(diff)
-    max_diff = np.max(diff)
+    weights = np.array(weights)
+    weighted_diff = diff * weights
+    base_score = np.sum(weighted_diff)
+    median_diff = np.median(weighted_diff)
+    max_diff = np.max(weighted_diff)
     penalty = alpha * max(0, max_diff - median_diff)
     score = base_score + penalty
-    d = len(scan_eig)
-    return score / (d + alpha)
+    return score / (np.sum(weights) + alpha)
 
 
-def compute_eig_similarity3(eigenvalues1, eigenvalues2, weights=[1.5, 1.25, 1], alpha=1.0):
+def compute_eig_similarity3(eigenvalues1, eigenvalues2, weights=[1, 0.5, 0.25], alpha=1.0):
     scan_eig = np.asarray(eigenvalues1)
     cad_eig = np.asarray(eigenvalues2)
     diff = np.abs(scan_eig - cad_eig) / scan_eig
@@ -74,7 +73,7 @@ def apply_filtering(single_scan_df, threshold=1, method="sim_score1"):
     
     return: list of str : ['763620', '763621', '763638', '763640', '763660']
     """
-    filtered_index = single_scan_df[single_scan_df[method] > threshold].index
+    filtered_index = single_scan_df[single_scan_df[method] < threshold].index
     list_of_str = filtered_index.tolist()
     return list_of_str
 
@@ -94,10 +93,9 @@ def get_rank_coarse(scan, coarse_result_df, metric="score_sim1"):
     scan_result = scan_result.to_dict()
     scan_result = pd.DataFrame.from_dict(scan_result).T
 
-    summary = {}    
     sorted_df = scan_result.sort_values(by=metric, ascending=True)
     scan_rank = sorted_df.index.get_loc(scan) + 1  # find scan index (1 + idx)
-
+    
     return scan_rank
 
 
@@ -210,6 +208,9 @@ def compute_eigenvalues(source_folder, target_folder):
                 # Compute the covariance matrix
                 covariance_matrix = np.cov(points.T)
                 eigenvalues = np.linalg.eigvals(covariance_matrix)
+                
+                # Sort the eigenvalues biggest to smallest
+                eigenvalues = np.sort(eigenvalues)[::-1]
 
                 # Save the eigenvalues
                 pcd_file = pcd_file.split(".")[0]
@@ -461,7 +462,7 @@ def precompute_pipeline(config_path):
             target_folder=config["paths"]["cad"]["eigenvalues"],
         )
 
-        # # Precomputing descriptors
+        # Precomputing descriptors
         print("\n\nComputing descriptors for scans  🛠️ ...")
         compute_descriptors(
             source_folder=config["paths"]["scan"]["preprocessed_pcd"],
@@ -484,7 +485,7 @@ def precompute_pipeline(config_path):
         
 
 
-def registration_based_pipeline(config_path):
+def reg_based_identification_pipeline(config_path):
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
         # Compute coarse score of every scan with every cad
@@ -502,28 +503,23 @@ def registration_based_pipeline(config_path):
         fine_results = {}
         
         # Use the coarse score to filter the scans
-        for scan in coarse_df.index:
-            print(f"Filtering scan experiment {scan}")
+        for scan in tqdm(list(coarse_df.index)[:5], desc="Coarse to fine filtering"):
             rank_coarse_results[scan] = {}
             coarse_scan_results = coarse_df[scan]
             coarse_scan_results = coarse_scan_results.to_dict()
             coarse_scan_results = pd.DataFrame.from_dict(coarse_scan_results).T
 
             # to make test, comment the fine filtering, and add as many metrics as you need
-            for method in ["score_sim1", "score_sim2", "score_sim3"]:
-                # Sort and apply the filtering
-                filtered_candidates = apply_filtering(coarse_scan_results, method=method, threshold=1)
+            for method in ["score_sim1"]:
+                # Sort and apply the threshold
+                filtered_candidates = apply_filtering(coarse_scan_results, method=method, threshold=1.1)
                 rank = get_rank_coarse(scan, coarse_df, metric=method)
-                # print(rank)
                 rank_coarse_results[scan][method] = rank
                 
                 # Fine filtering...
-                # fine_result = fine_filtering(scan, filtered_candidates, config)
-                # fine_results[scan] = fine_result
+                fine_result = fine_filtering(scan, filtered_candidates, config)
+                fine_results[scan] = fine_result
                 
-                
-            
-            
         # log scan experiment ranks
         coarse_rank_df = pd.DataFrame.from_dict(rank_coarse_results, orient="index")
         coarse_rank_df.to_json(config["paths"]["results"]["filtering_coarse_rank"])
@@ -531,16 +527,11 @@ def registration_based_pipeline(config_path):
         # TODO : compute mean and std of the ranks of each method
         
         fine_results_path = config["paths"]["results"]["filtering_fine"]
-        path_checker1(fine_results_path)
-        file_path = os.path.join(fine_results_path, "fine_results.json")
         pd.DataFrame.from_dict(fine_results).to_json(config["paths"]["results"]["filtering_fine"])
         print("Fine filtering results saved here 💾 ===> ", config["paths"]["results"]["filtering_fine"])
 
         
-        
-        
-        
 if __name__ == "__main__":
     config = "/app/bindmount/gedi_data_2/config.yaml"
-    # precompute_pipeline(config)
-    registration_based_pipeline(config)
+    #precompute_pipeline(config)
+    reg_based_identification_pipeline(config)
