@@ -1,40 +1,40 @@
+base: "/app/bindmount/gedi_data_2"
 paths:
   scan:
-    raw_pcd: "/app/bindmount/gedi_data_2/scans/generated_best/point_cloud"
-    preprocessed_pcd: "/app/bindmount/gedi_data_2/scans/generated_best/preprocess_point_cloud"
-    eigenvalues: "/app/bindmount/gedi_data_2/scans/generated_best/eigenvalues"
-    descriptors: "/app/bindmount/gedi_data_2/scans/generated_best/descriptors"
-    indices: "/app/bindmount/gedi_data_2/scans/generated_best/inds"
+    raw_pcd: "scans/generated_best/point_cloud"
+    preprocessed_pcd: "scans/generated_best/preprocess_point_cloud"
+    eigenvalues: "scans/generated_best/eigenvalues"
+    descriptors: "scans/generated_best/descriptors"
+    indices: "scans/generated_best/inds"
   cad:
-    raw_pcd: "/app/bindmount/gedi_data_2/cads/point_cloud"
-    preprocessed_pcd: "/app/bindmount/gedi_data_2/cads/preprocess"
-    eigenvalues: "/app/bindmount/gedi_data_2/cads/eigenvalues"
-    descriptors: "/app/bindmount/gedi_data_2/cads/descriptors"
-    indices: "/app/bindmount/gedi_data_2/cads/inds"
+    raw_pcd: "cads/point_cloud"
+    preprocessed_pcd: "cads/preprocess"
+    eigenvalues: "cads/eigenvalues"
+    descriptors: "cads/descriptors"
+    indices: "cads/inds"
   results:
-    filtering_coarse_overall: "/app/bindmount/gedi_data_2/scans/generated_best/filtering_coarse/overall_coarse.json"
-    filtering_coarse_rank: "/app/bindmount/gedi_data_2/scans/generated_best/filtering_coarse/coarse_rank.json"
-    figure: "/app/bindmount/gedi_data_2/scans/generated_best/figure"
+    filtering_coarse_overall: "scans/generated_best/filtering_coarse"
+    filtering_coarse_rank: "scans/generated_best/filtering_coarse"
+    figure: "scans/generated_best/figure"
+    filtering_fine: "scans/generated_best/filtering_fine"
+    registrations_viz: "scans/generated_best/registration_viz_test"
 
-    filtering_fine: "/app/bindmount/gedi_data_2/scans/generated_best/filtering_fine"
-    registrations_viz: "/app/bindmount/gedi_data_2/scans/generated_best/registration_viz"
-
+    filtering_coarse_overall_file_name : "overall_coarse.json"
+    filtering_coarse_rank_file_name: "coarse_rank.json"
+    filtering_fine_file_name : "overall_fine.json"
 preprocess_params:
-  scan:
-  
+  scan: {}
   cad:
     scale_factor: 0.001
 
-
 model:
   gedi_config: {
-            "dim": 32,  # descriptor output dimension
-            "samples_per_batch": 10, # number of patches per batch
+            "dim": 32,
+            "samples_per_batch": 10,
             "samples_per_patch_lrf": 5000,
-            "samples_per_patch_out": 512, 
+            "samples_per_patch_out": 512,
             "r_lrf": 0.5,
-            "fchkpt_gedi_net": "bindmount/gedi_data/model_weight/chkpts/3dmatch/chkpt.tar",
+            "fchkpt_gedi_net": "bindmount/gedi_data/model_weight/chkpts/3dmatch/chkpt.tar"
         }
   gedi_patches_per_pair: 5000
   gedi_voxel_size: 0.001
- 
