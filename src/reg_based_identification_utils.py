@@ -42,37 +42,45 @@ def get_max_eigen_from_folder(folder_path):
                 max_val = current_max
     return max_val
 
-def compute_eig_similarity1(scan_eig, cad_eig, penalty=False, dim_weight=[1, 1, 1], max_eigenvalue=1):
-    diff = np.abs(scan_eig - cad_eig) / max(scan_eig)
-    diff = diff[:3] * dim_weight
-    penalty_val = np.std(scan_eig) if penalty else 0
-    return np.sum(diff) + penalty_val
-
-
-def compute_eig_similarity2(scan_eig, cad_eig, penalty=True, dim_weight=[1, 0.5, 0.25], max_eigenvalue=1):
-    diff = np.abs(scan_eig - cad_eig) / max_eigenvalue
-    diff = diff[:3] * dim_weight
-    penalty_val = np.std(scan_eig) if penalty else 0
-    return np.sum(diff) + penalty_val
-
-
-def compute_eig_similarity3(eigenvalues1, eigenvalues2, weights=[1, 0.5, 0.25], alpha=1.0):
-    scan_eig = np.asarray(eigenvalues1)
-    cad_eig = np.asarray(eigenvalues2)
-    score = np.dot(scan_eig, cad_eig) / max(cad_eig)
+# mean : 6.55 ; std : 8.78
+def compute_eig_similarity1(scan_eig, cad_eig):
+    diff = np.abs(scan_eig - cad_eig)
+    score = np.sum(diff)
     return score
 
+# mean : 7.42 ; std : 9.33
+# This one game me an averege rank of 7.42 and standard deviation of 9.33
+# def compute_eig_similarity1(scan_eig, cad_eig, penalty=True, dim_weight=[1, 1, 1], max_eigenvalue=1, shift_penalty_factor=2, shift_threshold=0.3):
+#     diff = np.abs(scan_eig - cad_eig)
+#     rmse = np.sqrt(np.mean(diff ** 2))
+#     return rmse
+    
+def compute_eig_similarity2(scan_eig, cad_eig):
+    diff = np.abs(scan_eig - cad_eig)
+    penalty = np.std(diff)
+    return np.sum(diff) + penalty
 
-def apply_filtering(single_scan_df, threshold=1, method="sim_score1"):
+
+def compute_eig_similarity3(scan_eig, cad_eig):
+    
+    return 0
+
+
+def apply_filtering(single_scan_df, threshold=False, method="sim_score1"):
     """
     Apply a filtering method to a single scan experiment (1 scan cross with all cads)
     return the list of cads that passed the filtering
     
+    Threshold is better, but less convenient to tune. But in fact the number of similar cads 
+    in the dataset can highly affect the Ktop but not the threshold.
+    
     return: list of str : ['763620', '763621', '763638', '763640', '763660']
     """
     filtered_index = single_scan_df[single_scan_df[method] < threshold].index
-    list_of_str = filtered_index.tolist()
-    return list_of_str
+        
+    return filtered_index.tolist()
+
+
 
 def get_rank_coarse(scan, coarse_result_df, metric="score_sim1"):
     """
@@ -86,14 +94,30 @@ def get_rank_coarse(scan, coarse_result_df, metric="score_sim1"):
 
     metrics: list of str
     """
-    scan_result = coarse_result_df[scan]
+    scan_result = coarse_result_df.loc[scan]
     scan_result = scan_result.to_dict()
     scan_result = pd.DataFrame.from_dict(scan_result).T
 
     sorted_df = scan_result.sort_values(by=metric, ascending=True)
     scan_rank = sorted_df.index.get_loc(scan) + 1  # find scan index (1 + idx)
     
+    print(f"Rank : {scan_rank}")
+    print(f"Score : {scan_result.loc[scan][metric]}")
+    
     return scan_rank
+
+
+
+def get_rank_fine(scan_key, registration_result):
+    df = pd.DataFrame.from_dict(registration_result, orient="index")
+    df_sorted = df.sort_values(by="ransac_fitness", ascending=False)
+    
+    try:
+        rank = df_sorted.index.get_loc(scan_key) + 1 
+    except KeyError:
+        rank = None  # Si le scan n'est pas trouvé, on retourne None
+        
+    return rank
 
 
 
@@ -195,6 +219,9 @@ def compute_eigenvalues(source_folder, target_folder):
             # Load the scan
             pcd_file_path = os.path.join(source_folder, pcd_file)
             point_cloud = o3d.io.read_point_cloud(pcd_file_path)
+            
+            # voxel downsample the point cloud to avoid density issues
+            point_cloud = point_cloud.voxel_down_sample(voxel_size=0.001) # 0.1cm
             points = np.asarray(point_cloud.points)
 
             if points.shape[0] < 2:
@@ -292,7 +319,7 @@ def compute_coarse_score(
         # Process each scan
         for scan in tqdm(
             [f for f in os.listdir(scan_folder) if f.endswith(".ply")],
-            desc="Coarse filtering",
+            desc="Computing coarse scores",
         ):
             scan_result = {}
             scan_number = scan.split(".")[0]
@@ -304,7 +331,7 @@ def compute_coarse_score(
                 cad_number = cad.split(".")[0]
                 cad_eig_path = os.path.join(cad_eigenvalues_folder, cad_number + ".npy")
                 cad_eigenvalues = np.load(cad_eig_path)
-                score_sim1 = compute_eig_similarity1(scan_eigenvalues, cad_eigenvalues, max_eigenvalue=max_eigenvalue)
+                score_sim1 = compute_eig_similarity1(scan_eigenvalues, cad_eigenvalues)
                 score_sim2 = compute_eig_similarity2(scan_eigenvalues, cad_eigenvalues)
                 score_sim3 = compute_eig_similarity3(scan_eigenvalues, cad_eigenvalues)
 
@@ -418,133 +445,6 @@ def fine_filtering(scan, candidates, config):
     return registration_result
 
 
-def precompute_pipeline(config_path):
-    """
-    This pipeline preprocesses the scans and CADs, computes the eigenvalues and descriptors for each scan and CAD.
-    The pipeline is defined in the config file."""
-    with open(config_path, "r") as file:
-        config = yaml.safe_load(file)
-        
-        # Get the base path
-        base = config["base"]
-        gedi = load_model(config["model"]["gedi_config"])
-        
-        # For scans
-        raw_scan_folder = os.path.join(base, config["paths"]["scan"]["raw_pcd"].lstrip("/"))
-        preprocessed_scan_folder = os.path.join(base, config["paths"]["scan"]["preprocessed_pcd"].lstrip("/"))
-        scan_eigenvalues_folder = os.path.join(base, config["paths"]["scan"]["eigenvalues"].lstrip("/"))
-        scan_descriptors_folder = os.path.join(base, config["paths"]["scan"]["descriptors"].lstrip("/"))
-        scan_indices_folder = os.path.join(base, config["paths"]["scan"]["indices"].lstrip("/"))
-
-        # For CADs
-        raw_cad_folder = os.path.join(base, config["paths"]["cad"]["raw_pcd"].lstrip("/"))
-        preprocessed_cad_folder = os.path.join(base, config["paths"]["cad"]["preprocessed_pcd"].lstrip("/"))
-        cad_eigenvalues_folder = os.path.join(base, config["paths"]["cad"]["eigenvalues"].lstrip("/"))
-        cad_descriptors_folder = os.path.join(base, config["paths"]["cad"]["descriptors"].lstrip("/"))
-        cad_indices_folder = os.path.join(base, config["paths"]["cad"]["indices"].lstrip("/"))
-        
-        print("\n\nPreprocessing scans 🛠️ ...")
-        preprocess_scan(source_folder=raw_scan_folder,
-                        target_folder=preprocessed_scan_folder,
-                        patches_per_pair=config["model"]["gedi_patches_per_pair"])
-        
-        print("\n\nPreprocessing cads  🛠️ ...")
-        preprocess_CAD(source_folder=raw_cad_folder,
-                    target_folder=preprocessed_cad_folder,
-                    patches_per_pair=config["model"]["gedi_patches_per_pair"],
-                    scale_factor=config["preprocess_params"]["cad"]["scale_factor"])
-        
-        print("\n\nComputing eigenvalues for scans 🛠️ ... ")
-        compute_eigenvalues(source_folder=preprocessed_scan_folder,
-                            target_folder=scan_eigenvalues_folder)
-        
-        print("\n\nComputing eigenvalues for cads 🛠️ ... ")
-        compute_eigenvalues(source_folder=preprocessed_cad_folder,
-                            target_folder=cad_eigenvalues_folder)
-        
-        print("\n\nComputing descriptors for scans  🛠️ ...")
-        compute_descriptors(source_folder=preprocessed_scan_folder,
-                            desc_target_folder=scan_descriptors_folder,
-                            inds_target_folder=scan_indices_folder,
-                            patches_per_pair=config["model"]["gedi_patches_per_pair"],
-                            voxel_size=config["model"]["gedi_voxel_size"],
-                            model=load_model(config["model"]["gedi_config"]))
-        
-        print("\n\nComputing descriptors for cads  🛠️ ...")
-        compute_descriptors(source_folder=preprocessed_cad_folder,
-                            desc_target_folder=cad_descriptors_folder,
-                            inds_target_folder=cad_indices_folder,
-                            patches_per_pair=config["model"]["gedi_patches_per_pair"],
-                            voxel_size=config["model"]["gedi_voxel_size"],
-                            model=gedi)
-        
-
-def reg_based_identification_pipeline(config_path):
-    with open(config_path, "r") as file:
-        config = yaml.safe_load(file)
-        
-        base_path = config["base"]
-        scan_folder = os.path.join(base_path, config["paths"]["scan"]["preprocessed_pcd"])
-        cad_folder = os.path.join(base_path, config["paths"]["cad"]["preprocessed_pcd"])
-        scan_eigenvalues_folder = os.path.join(base_path, config["paths"]["scan"]["eigenvalues"])
-        cad_eigenvalues_folder = os.path.join(base_path, config["paths"]["cad"]["eigenvalues"])
-        filtering_coarse_file = os.path.join(base_path, config["paths"]["results"]["filtering_coarse_overall"], config["paths"]["results"]["filtering_coarse_overall_file_name"])
-        filtering_coarse_rank_file = os.path.join(base_path, config["paths"]["results"]["filtering_coarse_rank"], config["paths"]["results"]["filtering_coarse_rank_file_name"])
-        fine_filtering_folder = os.path.join(base_path, config["paths"]["results"]["filtering_fine"])
-        filtering_fine_file = os.path.join(base_path, config["paths"]["results"]["filtering_fine"], config["paths"]["results"]["filtering_fine_file_name"])
-        
-        print(f"scan_folder len: {len(os.listdir(scan_folder))}")
-        print(f"cad_folder len: {len(os.listdir(cad_folder))}")
-        
-        # Compute coarse score of every scan with every cad
-        coarse_df = compute_coarse_score(
-            scan_folder=scan_folder,
-            cad_folder=cad_folder,
-            scan_eigenvalues_folder=scan_eigenvalues_folder,
-            cad_eigenvalues_folder=cad_eigenvalues_folder,
-            filtering_coarse_folder=filtering_coarse_file,
-        )
-        
-        # Coarse to fine filtering
-        # Can't precompute the fine filtering because it depends on the coarse filtering
-        rank_coarse_results = {}
-        fine_results = {}
-        
-        
-        
-        # Use the coarse score to filter the scans
-        for scan in tqdm(list(coarse_df.index), desc="Coarse to fine filtering"):
-            rank_coarse_results[scan] = {}
-            coarse_scan_results = coarse_df.loc[scan]
-            coarse_scan_results = coarse_scan_results.to_dict()
-            coarse_scan_results = pd.DataFrame.from_dict(coarse_scan_results).T
-            
-
-            # to make test, comment the fine filtering, and add as many metrics as you need
-            for method in ["score_sim1"]:
-                # Sort and apply the threshold
-                filtered_candidates = apply_filtering(coarse_scan_results, method=method, threshold=0.6)
-                print(f"Filtered candidates for {scan} with {method}: ¬{filtered_candidates}")
-                rank = get_rank_coarse(scan, coarse_df, metric=method)
-                rank_coarse_results[scan][method] = rank
-                
-                # Fine filtering...
-                fine_result = fine_filtering(scan, filtered_candidates, config)
-                fine_results[scan] = fine_result
-            
-                
-        # log scan experiment ranks
-        coarse_rank_df = pd.DataFrame.from_dict(rank_coarse_results, orient="index")
-        print("Ranking of scan experiments saved here 💾 ===> ", filtering_coarse_rank_file)
-        
-        path_checker1(fine_filtering_folder)
-        pd.DataFrame.from_dict(fine_results).to_json(filtering_fine_file)
-        print("Fine filtering results saved here 💾 ===> ", filtering_fine_file)
-
         
 if __name__ == "__main__":
-    #config = "/app/bindmount/gedi_data_2/config.yaml"
-    # config = "/app/bindmount/gedi_data_real_scan/config_real_scan.yaml"
-    config = "/app/bindmount/gedi_data_real_scan_5x315/config_real_scan_5x315.yaml"
-    # precompute_pipeline(config)
-    reg_based_identification_pipeline(config)
+    pass

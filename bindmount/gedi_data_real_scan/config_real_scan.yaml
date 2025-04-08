@@ -35,7 +35,7 @@ model:
             "samples_per_patch_lrf": 5000,
             "samples_per_patch_out": 512,
             "r_lrf": 0.5,
-            "fchkpt_gedi_net": "/bindmount/gedi_data/model_weight/chkpts/3dmatch/chkpt.tar"
+            "fchkpt_gedi_net": "/app/bindmount/gedi_data/model_weight/chkpts/3dmatch/chkpt.tar"
         }
   gedi_patches_per_pair: 5000
   gedi_voxel_size: 0.001
