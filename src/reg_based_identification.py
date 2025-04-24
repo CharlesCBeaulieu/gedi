@@ -83,8 +83,11 @@ def reg_based_identification_pipeline(config_path, fine_filter=True):
         filtering_fine_file = os.path.join(base_path, config["paths"]["results"]["filtering_fine"], config["paths"]["results"]["filtering_fine_file_name"])
         path_checker1(filtering_coarse_folder)
         
-        print(f"scan_folder len: {len(os.listdir(scan_folder))}")
-        print(f"cad_folder len: {len(os.listdir(cad_folder))}")
+        try:
+            print(f"scan_folder len: {len(os.listdir(scan_folder))}")
+            print(f"cad_folder len: {len(os.listdir(cad_folder))}")
+        except FileNotFoundError as e:
+            print("Check for Precomputing... preprocess, eigenvalues, descriptors")
         
         # Compute coarse score of every scan with every cad
         coarse_df = compute_coarse_score(
@@ -94,6 +97,7 @@ def reg_based_identification_pipeline(config_path, fine_filter=True):
             cad_eigenvalues_folder=cad_eigenvalues_folder,
             filtering_coarse_folder=filtering_coarse_file,
         )
+        print(coarse_df)
         
         # Coarse to fine filtering
         # Can't precompute the fine filtering because it depends on the coarse filtering
@@ -110,9 +114,9 @@ def reg_based_identification_pipeline(config_path, fine_filter=True):
             
 
             # to make test, comment the fine filtering, and add as many metrics as you need
-            for method in ["score_sim1"]:
+            for method in ["score_sim1", "score_sim2"]:
                 # Sort and apply the threshold + get coarse rank 
-                filtered_candidates= apply_filtering(coarse_scan_results, method="score_sim1", threshold=0.01)
+                filtered_candidates= apply_filtering(coarse_scan_results, method="score_sim1", threshold=0.04618)
                 print("Scan : ", scan)
                 print("Metric : ", method)
                 print("Filtered candidates len: ", len(filtered_candidates))
@@ -139,9 +143,12 @@ def reg_based_identification_pipeline(config_path, fine_filter=True):
         pd.DataFrame.from_dict(rank_coarse_results, orient="index").to_json(filtering_coarse_rank_file)
         print("Ranking of scan experiments saved here 💾 ===> ", filtering_coarse_rank_file)
         
-        path_checker1(fine_filtering_folder)
-        pd.DataFrame.from_dict(fine_results).to_json(filtering_fine_file)
-        print("Fine filtering results saved here 💾 ===> ", filtering_fine_file)
+        if fine_filter:
+            path_checker1(fine_filtering_folder)
+            pd.DataFrame.from_dict(fine_results).to_json(filtering_fine_file)
+            print("Fine filtering results saved here 💾 ===> ", filtering_fine_file)
+
+
 
 # def test_coarse_filtering(config_path):
 #     """
@@ -203,22 +210,28 @@ def reg_based_identification_pipeline(config_path, fine_filter=True):
 
 
 def main():
-    configs = [
-        "/app/bindmount/gedi_data_2/config.yaml",
-        "/app/bindmount/gedi_data_real_scan/config_real_scan.yaml",
-        "/app/bindmount/gedi_data_real_scan_5x315/config_real_scan_5x315.yaml",
-        "/app/bindmount/gedi_data_4meters_scans/config_4meters.yaml"
-    ]
+    # configs = [
+    #     "/app/bindmount/gedi_data_2/config.yaml",
+    #     "/app/bindmount/gedi_data_real_scan/config_real_scan.yaml",
+    #     "/app/bindmount/gedi_data_real_scan_5x315/config_real_scan_5x315.yaml",
+    #     "/app/bindmount/gedi_data_4meters_scans/config_4meters.yaml",
+    # ]
     
-    # for config in configs:
-    #     print(f"Running pipeline for config: {config}")
-    #     precompute_pipeline(config_path=config, Preprocessing=False, Eigenvalues=True, Descriptors=False)
-    #     reg_based_identification_pipeline(config_path=config, fine_filtering=False)
+    # configs_4m = [
+    #     "/app/bindmount/gedi_data_subset25x25_4m/config_subset25x25_4m.yaml",
+    #     "/app/bindmount/gedi_data_subset25x50_4m/config_subset25x50_4m.yaml",
+    #     "/app/bindmount/gedi_data_subset25x100_4m/config_subset25x100_4m.yaml",
+    # ]
+    
+    config_new = ["/app/bindmount/test_set_30x30/config_30x30.yaml",
+                   "/app/bindmount/test_set_30x50/config_30x50.yaml",
+                   "/app/bindmount/test_set_30x100/config_30x100.yaml"]
+    
+    for config in config_new:
+        print(f"Running pipeline for config: {config}")
+        #precompute_pipeline(config_path=config, Preprocessing=True, Eigenvalues=True, Descriptors=True)
+        reg_based_identification_pipeline(config_path=config, fine_filter=True)
 
-    config = configs[2]
-    print(f"Running pipeline for config: {config}")
-    precompute_pipeline(config_path=config, Preprocessing=False, Eigenvalues=False, Descriptors=False)
-    reg_based_identification_pipeline(config_path=config, fine_filter=True)
-    
+
 if __name__ == "__main__":
     main()

@@ -1,0 +1,41 @@
+base: "/app/bindmount/test_set_30x30"
+paths:
+  scan:
+    raw_pcd: "scans/point_cloud"
+    preprocessed_pcd: "scans/preprocess_point_cloud"
+    eigenvalues: "scans/eigenvalues"
+    descriptors: "scans/descriptors"
+    indices: "scans/inds"
+  cad:
+    raw_pcd: "cads/point_cloud"
+    preprocessed_pcd: "cads/preprocess"
+    eigenvalues: "cads/eigenvalues"
+    descriptors: "cads/descriptors"
+    indices: "cads/inds"
+  results:
+    filtering_coarse_overall: "scans/filtering_coarse"
+    filtering_coarse_rank: "scans/filtering_coarse"
+    figure: "scans/figure"
+    filtering_fine: "scans/filtering_fine"
+    registrations_viz: "scans/registration_viz_test"
+    
+    filtering_coarse_overall_file_name : "overall_coarse.json"
+    filtering_coarse_rank_file_name: "coarse_rank.json"
+    filtering_fine_file_name : "overall_fine_test.json"
+
+preprocess_params:
+  scan: {}
+  cad:
+    scale_factor: 0.001
+
+model:
+  gedi_config: {
+            "dim": 32,
+            "samples_per_batch": 10,
+            "samples_per_patch_lrf": 3000,
+            "samples_per_patch_out": 512,
+            "r_lrf": 0.5,
+            "fchkpt_gedi_net": "/app/bindmount/gedi_data/model_weight/chkpts/3dmatch/chkpt.tar"
+        }
+  gedi_patches_per_pair: 3000
+  gedi_voxel_size: 0.001

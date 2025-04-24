@@ -42,11 +42,13 @@ def get_max_eigen_from_folder(folder_path):
                 max_val = current_max
     return max_val
 
+
 # mean : 6.55 ; std : 8.78
 def compute_eig_similarity1(scan_eig, cad_eig):
     diff = np.abs(scan_eig - cad_eig)
     score = np.sum(diff)
     return score
+
 
 # mean : 7.42 ; std : 9.33
 # This one game me an averege rank of 7.42 and standard deviation of 9.33
@@ -54,17 +56,60 @@ def compute_eig_similarity1(scan_eig, cad_eig):
 #     diff = np.abs(scan_eig - cad_eig)
 #     rmse = np.sqrt(np.mean(diff ** 2))
 #     return rmse
-    
-def compute_eig_similarity2(scan_eig, cad_eig):
-    diff = np.abs(scan_eig - cad_eig)
-    penalty = np.std(diff)
-    return np.sum(diff) + penalty
 
+
+# c'est la metric utilisez dans la presentation du 10 avril
+# def compute_eig_similarity2(scan_eig, cad_eig):
+#     diff = np.abs(scan_eig - cad_eig)
+#     penalty = np.std(diff)
+#     return np.sum(diff) + penalty
+
+
+def compute_eig_similarity2(scan_eig, cad_eig, scan_points=None, cad_points=None, scan_number=None, cad_number=None):
+    # Normalized score (does not take the size of the object into account) + we add the difference of size
+    norm_scan = scan_eig / scan_eig.sum()
+    norm_cad  = cad_eig / cad_eig.sum()
+    score_norm = np.sum(np.abs(norm_scan - norm_cad))
+    
+    scan_diag = np.linalg.norm(scan_points.max(axis=0) - scan_points.min(axis=0))
+    cad_diag  = np.linalg.norm(cad_points.max(axis=0) - cad_points.min(axis=0))
+    scale_diff = np.abs(scan_diag - cad_diag)
+    
+    w = 1 
+    
+    if True:
+        print(f"score_norm : {score_norm}, scale_diff : {scale_diff}")
+
+    return score_norm + w * scale_diff
+
+
+# def compute_eig_similarity2(scan_eig, cad_eig):
+#     # Normalized score (does not take the size of the object into account)
+#     norm_scan = scan_eig / scan_eig.sum()
+#     norm_cad  = cad_eig / cad_eig.sum()
+#     score_norm = np.sum(np.abs(norm_scan - norm_cad))
+    
+#     # this take the size
+#     size_scan = scan_eig.sum()
+#     size_cad  = cad_eig.sum()
+#     scale_diff = np.abs(size_scan - size_cad) / size_scan
+    
+#     w = 1  # weight factor for the scale difference
+    
+#     print(score_norm + w * scale_diff)
+
+#     return score_norm + w * scale_diff
+
+# def compute_eig_similarity2(scan_eig, cad_eig):
+#     """Anisotropy ratio"""
+#     ratios_scan = np.array([scan_eig[0] / scan_eig[1], scan_eig[1] / scan_eig[2]])
+#     ratios_cad  = np.array([cad_eig[0] / cad_eig[1], cad_eig[1] / cad_eig[2]])
+#     score_ratios = np.sum(np.abs(ratios_scan - ratios_cad))
+#     return score_ratios
 
 def compute_eig_similarity3(scan_eig, cad_eig):
-    
-    return 0
 
+    return 0
 
 def apply_filtering(single_scan_df, threshold=False, method="sim_score1"):
     """
@@ -325,16 +370,29 @@ def compute_coarse_score(
             scan_number = scan.split(".")[0]
             scan_eig_path = os.path.join(scan_eigenvalues_folder, scan_number + ".npy")
             scan_eigenvalues = np.load(scan_eig_path)
+            
+            # get the scan points
+            scan_points_path = os.path.join(scan_folder, scan_number + ".ply")
+            pcd_scan = o3d.io.read_point_cloud(scan_points_path)
+            points_scan = np.asarray(pcd_scan.points)
 
             # Process each CAD file
             for cad in [f for f in os.listdir(cad_folder) if f.endswith(".ply")]:
                 cad_number = cad.split(".")[0]
                 cad_eig_path = os.path.join(cad_eigenvalues_folder, cad_number + ".npy")
                 cad_eigenvalues = np.load(cad_eig_path)
+                
+                # load the cad points
+                cad_points_path = os.path.join(cad_folder, cad_number + ".ply")
+                pcd_cad = o3d.io.read_point_cloud(cad_points_path)
+                points_cad = np.asarray(pcd_cad.points)
+                
+                # plot_scan_cad(points_scan, points_cad)
+                
                 score_sim1 = compute_eig_similarity1(scan_eigenvalues, cad_eigenvalues)
-                score_sim2 = compute_eig_similarity2(scan_eigenvalues, cad_eigenvalues)
+                score_sim2 = compute_eig_similarity2(scan_eigenvalues, cad_eigenvalues, scan_points=points_scan, cad_points=points_cad, scan_number=scan_number, cad_number=cad_number)
                 score_sim3 = compute_eig_similarity3(scan_eigenvalues, cad_eigenvalues)
-
+                
                 # Save the similarity scores
                 scan_result[cad_number] = {
                     "score_sim1": score_sim1,
@@ -349,6 +407,19 @@ def compute_coarse_score(
         print("Coarse filtering results saved here 💾 ===> ", filtering_coarse_folder)
 
         return df_results
+
+
+def plot_scan_cad(scan_points, cad_points):
+    """
+    Plot the scan and cad points in 3D
+    """
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(scan_points[:, 0], scan_points[:, 1], scan_points[:, 2], c='r', marker='o')
+    ax.scatter(cad_points[:, 0], cad_points[:, 1], cad_points[:, 2], c='b', marker='^')
+    plt.savefig("scan_cad.png")
+
 
 
 def fine_filtering(scan, candidates, config):
