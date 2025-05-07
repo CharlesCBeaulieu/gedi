@@ -223,11 +223,13 @@ def main():
     #     "/app/bindmount/gedi_data_subset25x100_4m/config_subset25x100_4m.yaml",
     # ]
     
-    config_new = ["/app/bindmount/test_set_30x30/config_30x30.yaml",
-                   "/app/bindmount/test_set_30x50/config_30x50.yaml",
-                   "/app/bindmount/test_set_30x100/config_30x100.yaml"]
+    # config_new = ["/app/bindmount/test_set_30x30/config_30x30.yaml",
+    #                "/app/bindmount/test_set_30x50/config_30x50.yaml",
+    #                "/app/bindmount/test_set_30x100/config_30x100.yaml"]
     
-    for config in config_new:
+    config_t = ["/app/bindmount/gedi_data_real_scan_5x315/config_real_scan_5x315.yaml"]
+   
+    for config in config_t:
         print(f"Running pipeline for config: {config}")
         #precompute_pipeline(config_path=config, Preprocessing=True, Eigenvalues=True, Descriptors=True)
         reg_based_identification_pipeline(config_path=config, fine_filter=True)
