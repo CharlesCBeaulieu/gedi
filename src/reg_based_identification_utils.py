@@ -44,11 +44,16 @@ def get_max_eigen_from_folder(folder_path):
 
 
 # mean : 6.55 ; std : 8.78
+# norme L1, (faudrait tester la norme L2)
 def compute_eig_similarity1(scan_eig, cad_eig):
     diff = np.abs(scan_eig - cad_eig)
     score = np.sum(diff)
     return score
 
+def compute_eig_similarity2(scan_eig, cad_eig):
+    diff = scan_eig - cad_eig
+    score = np.linalg.norm(diff, ord=2)
+    return score
 
 # mean : 7.42 ; std : 9.33
 # This one game me an averege rank of 7.42 and standard deviation of 9.33
@@ -65,7 +70,7 @@ def compute_eig_similarity1(scan_eig, cad_eig):
 #     return np.sum(diff) + penalty
 
 
-def compute_eig_similarity2(scan_eig, cad_eig, scan_points=None, cad_points=None, scan_number=None, cad_number=None):
+def compute_eig_similarity3(scan_eig, cad_eig, scan_points=None, cad_points=None, scan_number=None, cad_number=None):
     # Normalized score (does not take the size of the object into account) + we add the difference of size
     norm_scan = scan_eig / scan_eig.sum()
     norm_cad  = cad_eig / cad_eig.sum()
@@ -107,9 +112,9 @@ def compute_eig_similarity2(scan_eig, cad_eig, scan_points=None, cad_points=None
 #     score_ratios = np.sum(np.abs(ratios_scan - ratios_cad))
 #     return score_ratios
 
-def compute_eig_similarity3(scan_eig, cad_eig):
 
-    return 0
+
+    
 
 def apply_filtering(single_scan_df, threshold=False, method="sim_score1"):
     """
@@ -390,8 +395,8 @@ def compute_coarse_score(
                 # plot_scan_cad(points_scan, points_cad)
                 
                 score_sim1 = compute_eig_similarity1(scan_eigenvalues, cad_eigenvalues)
-                score_sim2 = compute_eig_similarity2(scan_eigenvalues, cad_eigenvalues, scan_points=points_scan, cad_points=points_cad, scan_number=scan_number, cad_number=cad_number)
-                score_sim3 = compute_eig_similarity3(scan_eigenvalues, cad_eigenvalues)
+                score_sim2 = compute_eig_similarity2(scan_eigenvalues, cad_eigenvalues)
+                score_sim3 = compute_eig_similarity3(scan_eigenvalues, cad_eigenvalues, scan_points=points_scan, cad_points=points_cad, scan_number=scan_number, cad_number=cad_number)
                 
                 # Save the similarity scores
                 scan_result[cad_number] = {

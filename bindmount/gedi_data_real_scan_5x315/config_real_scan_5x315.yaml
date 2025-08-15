@@ -1,4 +1,4 @@
-base: "/app/bindmount/gedi_data_real_scan_5x315"
+base: "/root/gedi/bindmount/gedi_data_real_scan_5x315"
 paths:
   scan:
     raw_pcd: "scans/point_cloud"

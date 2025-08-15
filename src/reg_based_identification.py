@@ -113,10 +113,10 @@ def reg_based_identification_pipeline(config_path, fine_filter=True):
             coarse_scan_results = pd.DataFrame.from_dict(coarse_scan_results).T
             
 
-            # to make test, comment the fine filtering, and add as many metrics as you need
-            for method in ["score_sim1", "score_sim2"]:
+            # to make test, comment the fine filtering, and add as many metrics as needed
+            for method in ["score_sim1", "score_sim2", "score_sim3"]:
                 # Sort and apply the threshold + get coarse rank 
-                filtered_candidates= apply_filtering(coarse_scan_results, method="score_sim1", threshold=0.04618)
+                filtered_candidates = apply_filtering(coarse_scan_results, method="score_sim1", threshold=0.04618)
                 print("Scan : ", scan)
                 print("Metric : ", method)
                 print("Filtered candidates len: ", len(filtered_candidates))
@@ -223,11 +223,11 @@ def main():
     #     "/app/bindmount/gedi_data_subset25x100_4m/config_subset25x100_4m.yaml",
     # ]
     
-    # config_new = ["/app/bindmount/test_set_30x30/config_30x30.yaml",
-    #                "/app/bindmount/test_set_30x50/config_30x50.yaml",
-    #                "/app/bindmount/test_set_30x100/config_30x100.yaml"]
+    config_new = ["/root/gedi/bindmount/test_set_30x30/config_30x30.yaml",
+                    "/root/gedi/bindmount/test_set_30x50/config_30x50.yaml",
+                    "/root/gedi/bindmount/test_set_30x100/config_30x100.yaml"]
     
-    config_t = ["/app/bindmount/gedi_data_real_scan_5x315/config_real_scan_5x315.yaml"]
+    config_t = ["/root/gedi/bindmount/gedi_data_real_scan_5x315/config_real_scan_5x315.yaml"]
    
     for config in config_t:
         print(f"Running pipeline for config: {config}")
